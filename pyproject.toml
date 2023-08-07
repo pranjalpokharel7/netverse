@@ -1,0 +1,10 @@
+# black
+[tool.black]
+line-length = 72
+target-version = ['py311']
+
+# isort
+[tool.isort]
+profile = "black"
+line_length = 72
+skip = ["env/"]
