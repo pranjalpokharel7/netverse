@@ -1,6 +1,6 @@
 # host and port
 HOST = "0.0.0.0"
-PORT = 3500
+PORT = 80
 
 # response headers
 HTTP_ENCODED_HEADER_200_OK = "HTTP/1.0 200 OK\n\n".encode()

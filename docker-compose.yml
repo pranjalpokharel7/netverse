@@ -1,0 +1,7 @@
+services:
+  httpd:
+    build: .
+    ports:
+      - '3500:80'
+    command:
+      bash -c "cd httpd && python main.py"
