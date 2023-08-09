@@ -1,3 +1,5 @@
+import os
+
 # host and port
 HOST = "0.0.0.0"
 PORT = 80
@@ -19,3 +21,8 @@ HTTP_POST = "POST"
 INDEX_PAGE = "index.html"
 NOT_FOUND_PAGE = "404.html"
 SRC_DIR = "src/"
+
+# if we are in debug mode
+DEBUG = os.getenv("DEBUG", False)
+if DEBUG:
+    PORT = 3500
