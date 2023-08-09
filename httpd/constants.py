@@ -1,8 +1,16 @@
-import os
+from dotenv import dotenv_values
+
+config = dotenv_values(".env")
+
+# environment variables
+DEBUG = config.get("DEBUG")
+
+# server threads
+WORKER_THREADS = 10
 
 # host and port
 HOST = "0.0.0.0"
-PORT = 80
+PORT = 3500 if DEBUG else 80
 
 # response headers
 HTTP_ENCODED_HEADER_200_OK = "HTTP/1.0 200 OK\n\n".encode()
@@ -21,8 +29,3 @@ HTTP_POST = "POST"
 INDEX_PAGE = "index.html"
 NOT_FOUND_PAGE = "404.html"
 SRC_DIR = "src/"
-
-# if we are in debug mode
-DEBUG = os.getenv("DEBUG", False)
-if DEBUG:
-    PORT = 3500

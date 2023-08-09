@@ -1,6 +1,7 @@
 import logging
 import socket
-from contextlib import contextmanager
+from concurrent import futures
+from contextlib import ExitStack, contextmanager
 
 from constants import (
     HOST,
@@ -11,6 +12,7 @@ from constants import (
     NOT_FOUND_PAGE,
     PORT,
     SRC_DIR,
+    WORKER_THREADS,
 )
 
 logging.basicConfig(
@@ -30,6 +32,7 @@ def create_tcp_socket_server(host, port):
         _socket.bind((host, port))
         logging.info(f"Binding socket to {HOST}:{PORT}")
 
+        _socket.listen(1)
         yield _socket
 
     except Exception as e:
@@ -40,63 +43,60 @@ def create_tcp_socket_server(host, port):
         _socket.close()
 
 
-@contextmanager
-def create_client_connection(_socket):
-    conn = None
-    try:
-        conn, addr = http_socket.accept()
-        logging.info(f"Connected to client: {addr}")
+def process_client_connection(client_conn):
+    with ExitStack() as stack:
+        # defer connection close to the exit of with block
+        stack.callback(client_conn.close)
 
-        yield conn
+        # receive client request
+        request = client_conn.recv(1024).decode()
+        logging.info(f"Received request: {request}")
 
-    except Exception as e:
-        logging.error(f"Error in create_client_connection")
+        request_headers = request.split("\n")
+        request_line_args = request_headers[0].split()
+        http_method = request_line_args[0]
 
-    finally:
-        if conn:
-            conn.close()
+        # only accept GET requests for now
+        if http_method != HTTP_GET:
+            return
+
+        request_filename = request_line_args[1]
+
+        if request_filename == "/":
+            # requested file is either the index.html page
+            request_filename = INDEX_PAGE
+        else:
+            # or an html file inside the source directory
+            request_filename = SRC_DIR + request_filename
+
+        contents = ""
+        try:
+            with open(request_filename, "rb") as f:
+                contents = f.read()
+        except FileNotFoundError:
+            with open(NOT_FOUND_PAGE, "rb") as f:
+                contents = f.read()
+            client_conn.sendall(
+                HTTP_ENCODED_HEADER_404_NOT_FOUND + contents
+            )
+            return
+
+        # encode string to bytes and send to client connection
+        client_conn.sendall(HTTP_ENCODED_HEADER_200_OK + contents)
+
+
+def run_httpd():
+    with create_tcp_socket_server(HOST, PORT) as http_socket:
+        with futures.ThreadPoolExecutor(
+            max_workers=WORKER_THREADS
+        ) as executer:
+            while True:
+                client_conn, _ = http_socket.accept()
+                executer.submit(
+                    process_client_connection,
+                    client_conn,
+                )
 
 
 if __name__ == "__main__":
-    with create_tcp_socket_server(HOST, PORT) as http_socket:
-        http_socket.listen(1)
-
-        while True:
-            with create_client_connection(http_socket) as client_conn:
-                # receive client request
-                request = client_conn.recv(1024).decode()
-                logging.info(request)
-
-                request_headers = request.split("\n")
-                request_line_args = request_headers[0].split()
-                http_method = request_line_args[0]
-
-                # only accept GET requests for now
-                if http_method != HTTP_GET:
-                    continue
-
-                request_filename = request_line_args[1]
-
-                if request_filename == "/":
-                    # requested file is either the index.html page
-                    request_filename = INDEX_PAGE
-                else:
-                    # or an html file inside the source directory
-                    request_filename = SRC_DIR + request_filename
-
-                contents = ""
-                try:
-                    with open(request_filename, "rb") as f:
-                        contents = f.read()
-                except FileNotFoundError:
-                    with open(NOT_FOUND_PAGE, "rb") as f:
-                        contents = f.read()
-                    client_conn.sendall(
-                        HTTP_ENCODED_HEADER_404_NOT_FOUND + contents
-                    )
-                    continue
-
-                # encode string to bytes and send to client connection
-                client_conn.sendall(
-                    HTTP_ENCODED_HEADER_200_OK + contents
-                )
+    run_httpd()
