@@ -1,9 +1,9 @@
-FROM python:3.11.4-slim-bookworm as python
+FROM python:3.12.1-slim-bookworm as python
 
 FROM python as python-build-stage
 
-ARG REQUIREMENTS=./requirements.txt
-COPY ${REQUIREMENTS} .
+COPY ./requirements ./requirements
+ARG REQUIREMENTS=./requirements/base.txt
 RUN pip wheel --wheel-dir /usr/src/app/wheels  \
   -r ${REQUIREMENTS}
 
@@ -17,7 +17,7 @@ WORKDIR ${APP_HOME}
 COPY --from=python-build-stage /usr/src/app/wheels  /wheels/
 
 # use wheels to install python dependencies
-RUN pip install --no-cache-dir --no-index --find-links=/wheels/ /wheels/* \
+RUN pip install --no-cache-dir --no-index --find-links=/wheels/ $(ls /wheels/*) \
 	&& rm -rf /wheels/
 
 COPY . ${APP_HOME}
